@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+  <meta charset='UTF-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+  <title>Sales Field Tracker</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f3f4f6; color: #1f2937; }
+
+    nav {
+      background: #2623e5; color: white; padding: 16px 24px;
+      display: flex; align-items: center; gap: 24px;
+    }
+    nav h1 { font-size: 20px; }
+    nav a { color: white; text-decoration: none; font-size: 14px; opacity: 0.85; }
+    nav a:hover { opacity: 1; }
+
+    .container { max-width: 1100px; margin: 32px auto; padding: 0 24px; }
+
+    .card {
+      background: white; border-radius: 12px;
+      padding: 24px; margin-bottom: 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .card h2 { font-size: 18px; margin-bottom: 16px; color: #1A56A5; }
+
+    form label { display: block; font-size: 13px; color: #6b7280; margin-bottom: 4px; margin-top: 12px; }
+    form input, form textarea, form select {
+      width: 100%; padding: 10px; border: 1px solid #d1d5db;
+      border-radius: 8px; font-size: 14px;
+    }
+    form button {
+      margin-top: 16px; padding: 10px 24px;
+      background: #1A56A5; color: white; border: none;
+      border-radius: 8px; cursor: pointer; font-size: 14px;
+    }
+    form button:hover { background: #1244a0; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { background: #f9fafb; text-align: left; padding: 10px 12px;
+         font-size: 12px; text-transform: uppercase; color: #6b7280; }
+    td { padding: 12px; border-bottom: 1px solid #f3f4f6; }
+    tr:hover td { background: #f9fafb; }
+
+    .badge {
+      display: inline-block; padding: 2px 10px;
+      border-radius: 999px; font-size: 12px; font-weight: 500;
+    }
+    .badge-blue { background: #E6F1FB; color: #1A56A5; }
+    .btn-sm {
+      padding: 4px 12px; font-size: 12px; border: none;
+      border-radius: 6px; cursor: pointer;
+    }
+    .btn-red { background: #fee2e2; color: #991b1b; }
+    .msg { padding: 12px; border-radius: 8px; margin-top: 12px; font-size: 14px; }
+    .msg.success { background: #d1fae5; color: #065f46; }
+    .msg.error   { background: #fee2e2; color: #991b1b; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <h1>Sales Field Tracker</h1>
+  <a href='index.html'>Dashboard</a>
+  <a href='visits.html'>Log Visit</a>
+  <a href='map.html'>Map View</a>
+  <a href='reports.html'>Reports</a>
+</nav>
+
+<!-- Location Alert Banner -->
+<div id='missingAlert'
+  style='display:none;
+         background:#fef3c7;
+         border-bottom:2px solid #f59e0b;
+         padding:12px 24px;
+         font-size:14px;
+         color:#92400e'>
+  ⚠️ <strong>Location Alert — Not tracked today:</strong>
+  <span id='missingNames'></span>
+  <span style='margin-left:12px;font-size:12px;color:#b45309'>
+    Ask them to open map.html and click Clock In
+  </span>
+</div>
+
+<div class='container'>
+
+  <!-- Add Executive Form -->
+  <div class='card'>
+    <h2>Add Sales Executive</h2>
+    <form id='addExecForm'>
+      <label>Full Name *</label>
+      <input type='text' id='name' required placeholder='e.g. Rajesh Kumar'>
+      <label>Phone Number</label>
+      <input type='tel' id='phone' placeholder='e.g. 9876543210'>
+      <label>Email Address</label>
+      <input type='email' id='email' placeholder='Rajesh@swelectes.com'>
+      <label>Assigned Region *</label>
+      <input type='text' id='region' required placeholder='e.g. South India'>
+      <button type='submit'>Add Executive</button>
+    </form>
+    <div id='addMsg'></div>
+  </div>
+
+  <!-- Executive List Table -->
+  <div class='card'>
+    <h2>Sales Team</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th><th>Phone</th><th>Email</th><th>Region</th><th>Action</th>
+        </tr>
+      </thead>
+      <tbody id='execTable'><tr><td colspan='5'>Loading...</td></tr></tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+  const API = 'https://sales-field-tracker.onrender.com/api';
+
+  // Load executives when page opens
+  async function loadExecutives() {
+    const res  = await fetch(`${API}/executives`);
+    const data = await res.json();
+    const tbody = document.getElementById('execTable');
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="5">No executives yet. Add one above.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(e => `
+      <tr>
+        <td><strong>${e.name}</strong></td>
+        <td>${e.phone || '-'}</td>
+        <td>${e.email || '-'}</td>
+        <td><span class='badge badge-blue'>${e.region}</span></td>
+        <td>
+          <button class='btn-sm btn-red'
+            onclick='deleteExec(${e.id})'>Remove</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  // Add a new executive
+  document.getElementById('addExecForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const res = await fetch(`${API}/executives`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name:   document.getElementById('name').value,
+        phone:  document.getElementById('phone').value,
+        email:  document.getElementById('email').value,
+        region: document.getElementById('region').value,
+      }),
+    });
+    const msg = document.getElementById('addMsg');
+    if (res.ok) {
+      msg.innerHTML = "<div class='msg success'>Executive added!</div>";
+      e.target.reset();
+      loadExecutives();
+    } else {
+      msg.innerHTML = "<div class='msg error'>Something went wrong. Check your inputs.</div>";
+    }
+  };
+
+  // Delete an executive
+  async function deleteExec(id) {
+    if (!confirm('Remove this executive?')) return;
+    await fetch(`${API}/executives/${id}`, { method: 'DELETE' });
+    loadExecutives();
+  }
+
+  loadExecutives();
+
+  // Check which executives haven't shared location today
+async function checkMissingLocations() {
+  try {
+    const res  = await fetch('http://localhost:5000/api/locations/missing');
+    const data = await res.json();
+
+    if (data.missing_count > 0) {
+      const names = data.executives.map(e => e.name).join(', ');
+      document.getElementById('missingNames').textContent = names;
+      document.getElementById('missingAlert').style.display = 'block';
+    } else {
+      // All executives tracked — show green confirmation
+      document.getElementById('missingAlert').style.background = '#d1fae5';
+      document.getElementById('missingAlert').style.borderColor = '#10b981';
+      document.getElementById('missingAlert').style.color = '#065f46';
+      document.getElementById('missingAlert').style.display = 'block';
+      document.getElementById('missingNames').textContent = '';
+      document.getElementById('missingAlert').innerHTML =
+        '✅ <strong>All executives have shared their location today!</strong>';
+    }
+  } catch(err) {
+    console.log('Could not check locations:', err);
+  }
+}
+
+// Run the check when dashboard loads
+checkMissingLocations();
+
+// Re-check every 5 minutes automatically
+setInterval(checkMissingLocations, 5 * 60 * 1000);
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+  <meta charset='UTF-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+  <title>Log Visit | Sales Field Tracker</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f3f4f6;
+      color: #1f2937;
+    }
+
+    /* ── Navigation ── */
+    nav {
+      background: #1A56A5; color: white;
+      padding: 16px 24px;
+      display: flex; align-items: center; gap: 24px;
+    }
+    nav h1 { font-size: 20px; }
+    nav a  {
+      color: white; text-decoration: none;
+      font-size: 14px; opacity: 0.85;
+    }
+    nav a:hover { opacity: 1; }
+    nav a.active {
+      opacity: 1;
+      border-bottom: 2px solid white;
+      padding-bottom: 2px;
+    }
+
+    /* ── Page header banner ── */
+    .page-banner {
+      background: linear-gradient(135deg, #1A56A5 0%, #0F6E56 100%);
+      padding: 32px 24px;
+      color: white;
+    }
+    .page-banner h2 { font-size: 26px; margin-bottom: 6px; }
+    .page-banner p  { font-size: 14px; opacity: 0.85; }
+
+    /* ── Main layout ── */
+    .container {
+      max-width: 1100px;
+      margin: -24px auto 40px;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 18px 24px;
+      border-bottom: 1px solid #f3f4f6;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .card-header .icon {
+      width: 36px; height: 36px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .icon-blue  { background: #E6F1FB; }
+    .icon-teal  { background: #E1F5EE; }
+    .card-header h3 { font-size: 16px; color: #1f2937; }
+    .card-header p  { font-size: 12px; color: #6b7280; margin-top: 2px; }
+    .card-body { padding: 24px; }
+
+    /* ── Form styles ── */
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: bold;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #1f2937;
+      transition: border-color 0.2s;
+      background: #fafafa;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: #1A56A5;
+      background: white;
+    }
+    .form-group textarea { resize: vertical; min-height: 90px; }
+
+    /* Outcome option colors */
+    .outcome-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .outcome-option {
+      border: 1.5px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 10px 12px;
+      cursor: pointer;
+      font-size: 13px;
+      text-align: center;
+      transition: all 0.15s;
+      background: #fafafa;
+    }
+    .outcome-option:hover { border-color: #1A56A5; background: #E6F1FB; }
+    .outcome-option.selected {
+      border-color: #1A56A5;
+      background: #E6F1FB;
+      color: #1A56A5;
+      font-weight: bold;
+    }
+    #outcomeHidden { display: none; }
+
+    /* Submit button */
+    .submit-btn {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, #1A56A5, #0F6E56);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: opacity 0.2s;
+    }
+    .submit-btn:hover { opacity: 0.9; }
+
+    /* Success / error messages */
+    .msg {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      margin-top: 14px;
+      display: none;
+    }
+    .msg.success {
+      background: #d1fae5; color: #065f46;
+      border: 1px solid #6ee7b7;
+    }
+    .msg.error {
+      background: #fee2e2; color: #991b1b;
+      border: 1px solid #fca5a5;
+    }
+
+    /* ── Stats row ── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .stat-box {
+      background: white;
+      border-radius: 10px;
+      padding: 16px;
+      text-align: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .stat-box .num {
+      font-size: 30px;
+      font-weight: bold;
+      color: #1A56A5;
+    }
+    .stat-box .lbl {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 4px;
+    }
+
+    /* ── Visit cards (right panel) ── */
+    .visit-item {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      transition: box-shadow 0.2s;
+    }
+    .visit-item:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+
+    .visit-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: #f9fafb;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .visit-client  { font-weight: bold; font-size: 15px; }
+    .visit-exec    { font-size: 12px; color: #6b7280; margin-top: 2px; }
+
+    .visit-item-body {
+      padding: 14px 16px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .visit-field .key {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: #9ca3af;
+      margin-bottom: 3px;
+    }
+    .visit-field .val {
+      font-size: 13px;
+      color: #1f2937;
+    }
+    .visit-notes {
+      grid-column: span 2;
+      background: #f9fafb;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 13px;
+      color: #4b5563;
+      font-style: italic;
+    }
+
+    /* Outcome badges */
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .badge-closed   { background: #d1fae5; color: #065f46; }
+    .badge-followup { background: #fef3c7; color: #92400e; }
+    .badge-demo     { background: #E6F1FB; color: #1A56A5; }
+    .badge-notint   { background: #fee2e2; color: #991b1b; }
+    .badge-default  { background: #f3f4f6; color: #6b7280; }
+
+    /* Search / filter bar */
+    .filter-bar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .filter-bar input,
+    .filter-bar select {
+      padding: 8px 12px;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 13px;
+      background: white;
+    }
+    .filter-bar input { flex: 1; min-width: 160px; }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: #9ca3af;
+    }
+    .empty-state .big-icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-state p { font-size: 14px; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .container { grid-template-columns: 1fr; margin-top: -16px; }
+      .stats-row { grid-template-columns: 1fr 1fr; }
+      .outcome-grid { grid-template-columns: 1fr; }
+      .visit-item-body { grid-template-columns: 1fr; }
+      .visit-notes { grid-column: span 1; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav>
+  <h1>Sales Field Tracker</h1>
+  <a href='index.html'>Dashboard</a>
+  <a href='visits.html' class='active'>Log Visit</a>
+  <a href='map.html'>Map View</a>
+  <a href='reports.html'>Reports</a>
+</nav>
+
+<!-- Page banner -->
+<div class='page-banner'>
+  <h2>📋 Log a Client Visit</h2>
+  <p>Record your meeting details, notes, and outcome for every client visit</p>
+</div>
+
+<!-- Main layout -->
+<div class='container'>
+
+  <!-- LEFT: Log Visit Form -->
+  <div>
+    <div class='card'>
+      <div class='card-header'>
+        <div class='icon icon-blue'>📝</div>
+        <div>
+          <h3>New Visit Entry</h3>
+          <p>Fill in the details below</p>
+        </div>
+      </div>
+      <div class='card-body'>
+        <form id='visitForm'>
+
+          <div class='form-group'>
+            <label>Sales Executive *</label>
+            <select id='execSelect' required>
+              <option value=''>-- Select Executive --</option>
+            </select>
+          </div>
+
+          <div class='form-group'>
+            <label>Client / Company Name *</label>
+            <input type='text' id='clientName' required
+              placeholder='e.g. ABC Pharma Ltd'>
+          </div>
+
+          <div class='form-group'>
+            <label>Visit Date *</label>
+            <input type='date' id='visitDate' required>
+          </div>
+
+          <div class='form-group'>
+            <label>Meeting Notes</label>
+            <textarea id='notes'
+              placeholder='What was discussed? Any decisions made? Key points from the meeting...'
+            ></textarea>
+          </div>
+
+          <div class='form-group'>
+            <label>Visit Outcome *</label>
+            <input type='hidden' id='outcomeHidden' value='Follow-up needed'>
+            <div class='outcome-grid' id='outcomeGrid'>
+              <div class='outcome-option selected'
+                onclick='selectOutcome(this, "Follow-up needed")'>
+                🔄 Follow-up needed
+              </div>
+              <div class='outcome-option'
+                onclick='selectOutcome(this, "Deal closed")'>
+                ✅ Deal closed
+              </div>
+              <div class='outcome-option'
+                onclick='selectOutcome(this, "Demo scheduled")'>
+                📅 Demo scheduled
+              </div>
+              <div class='outcome-option'
+                onclick='selectOutcome(this, "Not interested")'>
+                ❌ Not interested
+              </div>
+              <div class='outcome-option'
+                onclick='selectOutcome(this, "Will decide later")'>
+                ⏳ Will decide later
+              </div>
+              <div class='outcome-option'
+                onclick='selectOutcome(this, "Order placed")'>
+                🛒 Order placed
+              </div>
+            </div>
+          </div>
+
+          <button type='submit' class='submit-btn'>
+            ➕ Log This Visit
+          </button>
+
+        </form>
+
+        <div class='msg success' id='successMsg'>
+          ✅ Visit logged successfully!
+        </div>
+        <div class='msg error' id='errorMsg'>
+          ⚠️ Something went wrong. Please check all fields.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Recent Visits -->
+  <div>
+
+    <!-- Stats row -->
+    <div class='stats-row'>
+      <div class='stat-box'>
+        <div class='num' id='statTotal'>0</div>
+        <div class='lbl'>Total Visits</div>
+      </div>
+      <div class='stat-box'>
+        <div class='num' id='statToday'>0</div>
+        <div class='lbl'>Today</div>
+      </div>
+      <div class='stat-box'>
+        <div class='num' id='statClosed'>0</div>
+        <div class='lbl'>Deals Closed</div>
+      </div>
+    </div>
+
+    <!-- Recent visits card -->
+    <div class='card'>
+      <div class='card-header'>
+        <div class='icon icon-teal'>📊</div>
+        <div>
+          <h3>Recent Visits</h3>
+          <p>Latest 20 entries across all executives</p>
+        </div>
+      </div>
+      <div class='card-body' style='padding:16px'>
+
+        <!-- Filter bar -->
+        <div class='filter-bar'>
+          <input type='text' id='searchInput'
+            placeholder='🔍  Search client name...'
+            oninput='filterVisits()'>
+          <select id='filterExec' onchange='filterVisits()'>
+            <option value=''>All Executives</option>
+          </select>
+        </div>
+
+        <!-- Visit cards list -->
+        <div id='visitList'>
+          <div class='empty-state'>
+            <div class='big-icon'>📭</div>
+            <p>Loading visits...</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const API = 'https://sales-field-tracker.onrender.com/api';
+  let allVisits    = [];
+  let executives   = [];
+
+  // ── Set today's date as default ───────────────────────
+  document.getElementById('visitDate').value =
+    new Date().toISOString().split('T')[0];
+
+  // ── Outcome selector ──────────────────────────────────
+  function selectOutcome(el, value) {
+    document.querySelectorAll('.outcome-option')
+      .forEach(o => o.classList.remove('selected'));
+    el.classList.add('selected');
+    document.getElementById('outcomeHidden').value = value;
+  }
+
+  // ── Badge color by outcome ────────────────────────────
+  function badgeClass(outcome) {
+    if (!outcome) return 'badge-default';
+    const o = outcome.toLowerCase();
+    if (o.includes('closed') || o.includes('order')) return 'badge-closed';
+    if (o.includes('follow'))  return 'badge-followup';
+    if (o.includes('demo'))    return 'badge-demo';
+    if (o.includes('not'))     return 'badge-notint';
+    return 'badge-default';
+  }
+
+  // ── Load executives ───────────────────────────────────
+  async function loadExecutives() {
+    const res  = await fetch(`${API}/executives`);
+    executives = await res.json();
+
+    const sel      = document.getElementById('execSelect');
+    const filterSel = document.getElementById('filterExec');
+
+    executives.forEach(e => {
+      sel.innerHTML       += `<option value='${e.id}'>${e.name} — ${e.region}</option>`;
+      filterSel.innerHTML += `<option value='${e.id}'>${e.name}</option>`;
+    });
+  }
+
+  // ── Load and display visits ───────────────────────────
+  async function loadVisits() {
+    const res = await fetch(`${API}/visits`);
+    allVisits = await res.json();
+    updateStats();
+    renderVisits(allVisits);
+  }
+
+  // ── Update stats numbers ──────────────────────────────
+  function updateStats() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('statTotal').textContent =
+      allVisits.length;
+    document.getElementById('statToday').textContent =
+      allVisits.filter(v => v.visit_date === today).length;
+    document.getElementById('statClosed').textContent =
+      allVisits.filter(v =>
+        v.outcome?.toLowerCase().includes('closed') ||
+        v.outcome?.toLowerCase().includes('order')
+      ).length;
+  }
+
+  // ── Render visit cards ────────────────────────────────
+  function renderVisits(visits) {
+    const list = document.getElementById('visitList');
+
+    if (!visits.length) {
+      list.innerHTML = `
+        <div class='empty-state'>
+          <div class='big-icon'>📭</div>
+          <p>No visits found. Log your first visit using the form!</p>
+        </div>`;
+      return;
+    }
+
+    const execMap = Object.fromEntries(
+      executives.map(e => [e.id, e.name])
+    );
+
+    list.innerHTML = visits.slice(0, 20).map(v => `
+      <div class='visit-item'>
+        <div class='visit-item-header'>
+          <div>
+            <div class='visit-client'>${v.client_name}</div>
+            <div class='visit-exec'>
+              👤 ${execMap[v.executive_id] || 'Unknown'}
+            </div>
+          </div>
+          <span class='badge ${badgeClass(v.outcome)}'>
+            ${v.outcome || 'No outcome'}
+          </span>
+        </div>
+        <div class='visit-item-body'>
+          <div class='visit-field'>
+            <div class='key'>📅 Visit Date</div>
+            <div class='val'>${v.visit_date}</div>
+          </div>
+          <div class='visit-field'>
+            <div class='key'>🗺️ Region</div>
+            <div class='val'>
+              ${executives.find(e => e.id == v.executive_id)?.region || '—'}
+            </div>
+          </div>
+          ${v.meeting_notes ? `
+          <div class='visit-notes'>
+            💬 "${v.meeting_notes}"
+          </div>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // ── Filter visits by search or executive ──────────────
+  function filterVisits() {
+    const search  = document.getElementById('searchInput').value.toLowerCase();
+    const execId  = document.getElementById('filterExec').value;
+
+    const filtered = allVisits.filter(v => {
+      const matchSearch = !search ||
+        v.client_name.toLowerCase().includes(search) ||
+        (v.meeting_notes || '').toLowerCase().includes(search);
+      const matchExec = !execId || v.executive_id == execId;
+      return matchSearch && matchExec;
+    });
+
+    renderVisits(filtered);
+  }
+
+  // ── Submit new visit ──────────────────────────────────
+  document.getElementById('visitForm').onsubmit = async (e) => {
+    e.preventDefault();
+
+    const successMsg = document.getElementById('successMsg');
+    const errorMsg   = document.getElementById('errorMsg');
+    successMsg.style.display = 'none';
+    errorMsg.style.display   = 'none';
+
+    const res = await fetch(`${API}/visits`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        executive_id:  document.getElementById('execSelect').value,
+        client_name:   document.getElementById('clientName').value,
+        visit_date:    document.getElementById('visitDate').value,
+        meeting_notes: document.getElementById('notes').value,
+        outcome:       document.getElementById('outcomeHidden').value,
+      }),
+    });
+
+    if (res.ok) {
+      // Show success message
+      successMsg.style.display = 'block';
+
+      // Reset form (keep date and executive selected)
+      const savedExec = document.getElementById('execSelect').value;
+      document.getElementById('clientName').value = '';
+      document.getElementById('notes').value      = '';
+
+      // Reset outcome to first option
+      document.querySelectorAll('.outcome-option')
+        .forEach((o, i) => o.classList.toggle('selected', i === 0));
+      document.getElementById('outcomeHidden').value = 'Follow-up needed';
+
+      // Restore executive selection
+      document.getElementById('execSelect').value = savedExec;
+
+      // Refresh visit list and stats
+      await loadVisits();
+
+      // Hide success message after 3 seconds
+      setTimeout(() => { successMsg.style.display = 'none'; }, 3000);
+
+    } else {
+      errorMsg.style.display = 'block';
+      setTimeout(() => { errorMsg.style.display = 'none'; }, 4000);
+    }
+  };
+
+  // ── Start everything ──────────────────────────────────
+  loadExecutives().then(loadVisits);
+</script>
+</body>
+</html>

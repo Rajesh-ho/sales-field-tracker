@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+  <meta charset='UTF-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+  <title>Map View</title>
+
+  <!-- Leaflet CSS (free, no API key needed) -->
+  <link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; }
+
+    /* ── Navigation bar ── */
+    nav {
+      background: #1A56A5; color: white;
+      padding: 16px 24px; display: flex;
+      gap: 24px; align-items: center;
+    }
+    nav h1 { font-size: 20px; }
+    nav a  { color: white; text-decoration: none; font-size: 14px; opacity: 0.85; }
+    nav a:hover { opacity: 1; }
+
+    /* ── Controls bar below nav ── */
+    #controls {
+      padding: 14px 24px;
+      background: white;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    /* Dropdown */
+    #execSelect {
+      padding: 8px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 14px;
+      min-width: 200px;
+    }
+
+    /* Clock In button */
+    #clockInBtn {
+      padding: 10px 20px;
+      background: #0F6E56;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    #clockInBtn:hover { background: #0a5240; }
+
+    /* Clock Out button (hidden by default) */
+    #clockOutBtn {
+      display: none;
+      padding: 10px 20px;
+      background: #991b1b;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    #clockOutBtn:hover { background: #7f1d1d; }
+
+    /* Refresh button */
+    #refreshBtn {
+      padding: 10px 16px;
+      background: #1A56A5;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    #refreshBtn:hover { background: #1244a0; }
+
+    /* Green tracking badge */
+    #trackingBadge {
+      display: none;
+      background: #d1fae5;
+      color: #065f46;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    /* Status message text */
+    #status {
+      font-size: 13px;
+      color: #6b7280;
+    }
+
+    /* ── The map itself ── */
+    #map {
+      height: calc(100vh - 130px);
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav>
+  <h1>Sales Field Tracker</h1>
+  <a href='index.html'>Dashboard</a>
+  <a href='visits.html'>Log Visit</a>
+  <a href='map.html'>Map View</a>
+  <a href='reports.html'>Reports</a>
+</nav>
+
+<!-- Controls bar -->
+<div id='controls'>
+
+  <!-- Step 1: Executive selector -->
+  <div style='display:flex;flex-direction:column;gap:2px'>
+    <label style='font-size:11px;color:#6b7280;font-weight:bold'>SELECT YOUR NAME</label>
+    <select id='execSelect'>
+      <option value=''>-- Select your name --</option>
+    </select>
+  </div>
+
+  <!-- Step 2: Clock In button -->
+  <button id='clockInBtn' onclick='startAutoTracking()'>
+    🟢 Clock In &amp; Start Tracking
+  </button>
+
+  <!-- Clock Out button (shown after clock in) -->
+  <button id='clockOutBtn' onclick='stopAutoTracking()'>
+    🔴 Clock Out
+  </button>
+
+  <!-- Auto tracking indicator badge -->
+  <span id='trackingBadge'>
+    📡 Auto-tracking ON (every 10 min)
+  </span>
+
+  <!-- Refresh map button -->
+  <button id='refreshBtn' onclick='loadPins()'>
+    🔄 Refresh Map
+  </button>
+
+  <!-- Status message -->
+  <span id='status'>Select your name and click Clock In to begin</span>
+
+</div>
+
+<!-- Map container -->
+<div id='map'></div>
+
+<!-- Leaflet JS -->
+<script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'></script>
+
+<script>
+  const API = 'https://sales-field-tracker.onrender.com/api';
+
+  // ── Initialize the map centered on India ──────────────────
+  const map = L.map('map').setView([20.5937, 78.9629], 5);
+
+  // Free OpenStreetMap tiles — no API key needed!
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 18,
+  }).addTo(map);
+
+  // ── App state variables ───────────────────────────────────
+  let markers          = [];   // Map pin references
+  let executives       = [];   // List of all executives
+  let autoTrackInterval = null; // Holds the 10-min timer
+
+  // ═══════════════════════════════════════════════════════
+  //  REMEMBER WHO IS LOGGED IN (survives page refresh)
+  // ═══════════════════════════════════════════════════════
+  function saveSession(id, name) {
+    localStorage.setItem('selected_exec_id',   id);
+    localStorage.setItem('selected_exec_name', name);
+  }
+
+  function getSession() {
+    return {
+      id:   localStorage.getItem('selected_exec_id'),
+      name: localStorage.getItem('selected_exec_name'),
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  LOAD EXECUTIVES INTO DROPDOWN
+  // ═══════════════════════════════════════════════════════
+  async function loadExecutives() {
+    const res  = await fetch(`${API}/executives`);
+    executives = await res.json();
+
+    const sel = document.getElementById('execSelect');
+    executives.forEach(e => {
+      sel.innerHTML +=
+        `<option value='${e.id}'>${e.name} — ${e.region}</option>`;
+    });
+
+    // Restore previously selected executive after page refresh
+    const saved = getSession();
+    if (saved.id) {
+      sel.value = saved.id;
+
+      // If they were tracking before refresh, restart automatically
+      if (localStorage.getItem('auto_tracking') === 'true') {
+        startAutoTracking();
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  SEND GPS LOCATION TO SERVER
+  // ═══════════════════════════════════════════════════════
+  function sendLocation(execId) {
+    return new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const { latitude, longitude } = pos.coords;
+
+          // Save to database via API
+          await fetch(`${API}/location`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              executive_id: execId,
+              latitude,
+              longitude,
+            }),
+          });
+
+          // Update status bar
+          const time = new Date().toLocaleTimeString();
+          setStatus(
+            `✅ Location auto-saved at ${time}` +
+            ` (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`
+          );
+
+          resolve({ latitude, longitude });
+        },
+        (err) => {
+          // Common errors and friendly messages
+          const msgs = {
+            1: 'Location permission denied. Please allow GPS in browser settings.',
+            2: 'GPS signal not available. Try moving to an open area.',
+            3: 'GPS took too long. Will retry in 10 minutes.',
+          };
+          setStatus('⚠️ ' + (msgs[err.code] || err.message));
+          reject(err);
+        },
+        {
+          enableHighAccuracy: true, // Use GPS chip, not WiFi
+          timeout:            15000, // Wait up to 15 seconds
+          maximumAge:         0,     // Always get fresh location
+        }
+      );
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  START AUTO TRACKING (Clock In)
+  // ═══════════════════════════════════════════════════════
+  async function startAutoTracking() {
+    const execId = document.getElementById('execSelect').value;
+
+    if (!execId) {
+      alert('Please select your name from the dropdown first!');
+      return;
+    }
+
+    // Save who is tracking
+    const execName = executives.find(e => e.id == execId)?.name || 'Executive';
+    saveSession(execId, execName);
+    localStorage.setItem('auto_tracking', 'true');
+
+    // Update button visibility
+    document.getElementById('clockInBtn').style.display    = 'none';
+    document.getElementById('clockOutBtn').style.display   = 'inline-block';
+    document.getElementById('trackingBadge').style.display = 'inline-block';
+
+    setStatus(`🟢 Tracking started for ${execName}. Sending location now...`);
+
+    // ── Send location immediately on clock in ──────────
+    try {
+      await sendLocation(execId);
+      await loadPins(); // Refresh map straight away
+    } catch(e) {
+      // Error message already shown in setStatus
+    }
+
+    // ── Then automatically every 10 minutes ───────────
+    // Change 10 * 60 * 1000 to adjust interval
+    // e.g. 5 * 60 * 1000 = every 5 minutes
+    autoTrackInterval = setInterval(async () => {
+      try {
+        await sendLocation(execId);
+        await loadPins();
+      } catch(e) {
+        // Silently retry next interval
+      }
+    }, 10 * 60 * 1000); // ← 10 minutes
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  STOP AUTO TRACKING (Clock Out)
+  // ═══════════════════════════════════════════════════════
+  function stopAutoTracking() {
+    // Stop the timer
+    clearInterval(autoTrackInterval);
+    autoTrackInterval = null;
+
+    // Clear saved session
+    localStorage.setItem('auto_tracking', 'false');
+
+    // Update buttons
+    document.getElementById('clockInBtn').style.display    = 'inline-block';
+    document.getElementById('clockOutBtn').style.display   = 'none';
+    document.getElementById('trackingBadge').style.display = 'none';
+
+    setStatus('🔴 Tracking stopped. Location will no longer be shared. Have a great day!');
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  LOAD ALL EXECUTIVE PINS ON MAP
+  // ═══════════════════════════════════════════════════════
+  async function loadPins() {
+    // Remove old pins
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+
+    const selectedId = document.getElementById('execSelect').value;
+
+    try {
+      const res  = await fetch(`${API}/locations/latest`);
+      const locs = await res.json();
+
+      let count = 0;
+
+      locs
+        .filter(l => !selectedId || l.id == selectedId)
+        .filter(l => l.latitude && l.longitude)
+        .forEach(l => {
+          const time = l.recorded_at
+            ? new Date(l.recorded_at).toLocaleString()
+            : 'Unknown';
+
+          const marker = L.marker([l.latitude, l.longitude])
+            .addTo(map)
+            .bindPopup(`
+              <div style="font-family:Arial;min-width:160px">
+                <b style="font-size:15px">${l.name}</b><br>
+                <span style="color:#6b7280">Region: ${l.region}</span><br>
+                <hr style="margin:6px 0;border-color:#e5e7eb">
+                📍 Last seen:<br>
+                <b>${time}</b><br>
+                <small style="color:#9ca3af">
+                  Updates every 10 min automatically
+                </small>
+              </div>
+            `);
+
+          markers.push(marker);
+          count++;
+        });
+
+      // If only one exec selected and found, zoom to them
+      if (selectedId && count === 1) {
+        map.setView(
+          [markers[0].getLatLng().lat, markers[0].getLatLng().lng],
+          13
+        );
+      }
+
+    } catch(err) {
+      setStatus('⚠️ Could not load pins. Is the server running?');
+    }
+  }
+
+  // ── Helper: update the status bar text ───────────────────
+  function setStatus(msg) {
+    document.getElementById('status').textContent = msg;
+  }
+
+  // ── Auto-refresh the map every 5 minutes ─────────────────
+  setInterval(loadPins, 5 * 60 * 1000);
+
+  // ── Start everything when page loads ─────────────────────
+  loadExecutives().then(loadPins);
+
+</script>
+</body>
+</html>

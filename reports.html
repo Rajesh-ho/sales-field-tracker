@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+  <meta charset='UTF-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+  <title>Reports</title>
+
+  <!-- Leaflet for mini maps -->
+  <link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'>
+  <script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f3f4f6; color: #1f2937; }
+
+    nav {
+      background: #1A56A5; color: white; padding: 16px 24px;
+      display: flex; align-items: center; gap: 24px;
+    }
+    nav h1 { font-size: 20px; }
+    nav a { color: white; text-decoration: none; font-size: 14px; opacity: 0.85; }
+    nav a:hover { opacity: 1; }
+
+    .container { max-width: 1100px; margin: 32px auto; padding: 0 24px; }
+
+    .card {
+      background: white; border-radius: 12px;
+      padding: 24px; margin-bottom: 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .card h2 { font-size: 18px; margin-bottom: 16px; color: #1A56A5; }
+
+    label { display: block; font-size: 13px; color: #6b7280; margin-bottom: 4px; margin-top: 12px; }
+    select, input {
+      padding: 10px; border: 1px solid #d1d5db;
+      border-radius: 8px; font-size: 14px; width: 100%;
+    }
+    button {
+      margin-top: 16px; padding: 10px 24px;
+      background: #1A56A5; color: white; border: none;
+      border-radius: 8px; cursor: pointer; font-size: 14px;
+    }
+    button:hover { background: #1244a0; }
+
+    /* Summary bar */
+    .summary {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 16px; margin-bottom: 24px;
+    }
+    .summary-box {
+      background: #f0f9ff; border-radius: 10px;
+      padding: 16px; text-align: center;
+    }
+    .summary-box .number {
+      font-size: 36px; font-weight: bold; color: #1A56A5;
+    }
+    .summary-box .label {
+      font-size: 13px; color: #6b7280; margin-top: 4px;
+    }
+
+    /* Visit cards */
+    .visit-card {
+      border: 1px solid #e5e7eb; border-radius: 10px;
+      margin-bottom: 16px; overflow: hidden;
+    }
+    .visit-header {
+      display: flex; justify-content: space-between;
+      align-items: center; padding: 14px 16px;
+      background: #f9fafb; border-bottom: 1px solid #e5e7eb;
+    }
+    .visit-header .client { font-weight: bold; font-size: 15px; }
+    .visit-header .date { font-size: 13px; color: #6b7280; }
+    .badge {
+      display: inline-block; padding: 3px 12px;
+      border-radius: 999px; font-size: 12px; font-weight: 500;
+      background: #E6F1FB; color: #1A56A5;
+    }
+
+    .visit-body { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+
+    /* Left: visit details */
+    .visit-details { padding: 16px; }
+    .visit-details .row { margin-bottom: 10px; }
+    .visit-details .row .key {
+      font-size: 11px; text-transform: uppercase;
+      color: #9ca3af; margin-bottom: 2px;
+    }
+    .visit-details .row .val { font-size: 14px; color: #1f2937; }
+
+    /* Right: mini map */
+    .visit-map {
+      min-height: 200px; background: #f3f4f6;
+      position: relative;
+    }
+    .mini-map { height: 200px; width: 100%; }
+    .no-location {
+      height: 200px; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      color: #9ca3af; font-size: 13px; gap: 8px;
+    }
+    .no-location .icon { font-size: 32px; }
+
+    /* Export button */
+    .export-btn {
+      background: #0F6E56; margin-top: 0; margin-left: 12px;
+    }
+    .export-btn:hover { background: #0a5240; }
+
+    .actions { display: flex; align-items: center; flex-wrap: wrap; }
+
+    @media (max-width: 640px) {
+      .visit-body { grid-template-columns: 1fr; }
+      .summary { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <h1>Sales Field Tracker</h1>
+  <a href='index.html'>Dashboard</a>
+  <a href='visits.html'>Log Visit</a>
+  <a href='map.html'>Map View</a>
+  <a href='reports.html'>Reports</a>
+</nav>
+
+<div class='container'>
+
+  <!-- Filter Form -->
+  <div class='card'>
+    <h2>Generate Performance Report</h2>
+    <form id='reportForm' style='display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end'>
+      <div style='flex:1;min-width:200px'>
+        <label>Sales Executive</label>
+        <select id='execSelect' required>
+          <option value=''>-- Select Executive --</option>
+        </select>
+      </div>
+      <div style='flex:1;min-width:200px'>
+        <label>Report Type</label>
+        <select id='reportType'>
+          <option value='daily'>Daily (Today)</option>
+          <option value='weekly'>Weekly (Last 7 Days)</option>
+        </select>
+      </div>
+      <div>
+        <button type='submit'>Generate Report</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Report Output -->
+  <div id='reportResult' style='display:none'>
+
+    <!-- Summary boxes -->
+    <div class='summary'>
+      <div class='summary-box'>
+        <div class='number' id='totalVisits'>0</div>
+        <div class='label'>Total Visits</div>
+      </div>
+      <div class='summary-box'>
+        <div class='number' id='locatedVisits'>0</div>
+        <div class='label'>Visits with Location</div>
+      </div>
+      <div class='summary-box'>
+        <div class='number' id='reportPeriod' style='font-size:16px;padding-top:8px'>-</div>
+        <div class='label'>Report Period</div>
+      </div>
+    </div>
+
+    <!-- Executive info -->
+    <div class='card' style='margin-bottom:24px'>
+      <h2 id='execTitle'>Executive Report</h2>
+      <p id='execDetails' style='font-size:14px;color:#6b7280'></p>
+    </div>
+
+    <!-- Visit cards with mini maps -->
+    <div id='visitCards'></div>
+
+    <!-- Export -->
+    <div class='actions'>
+      <button onclick='exportCSV()' class='export-btn'>
+        Export to CSV (with Locations)
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const API = 'https://sales-field-tracker.onrender.com/api';
+  let reportData = null;
+  let miniMaps = [];
+
+  // Load executives into dropdown
+  async function loadExecutives() {
+    const res = await fetch(`${API}/executives`);
+    const execs = await res.json();
+    const sel = document.getElementById('execSelect');
+    execs.forEach(e => {
+      sel.innerHTML += `<option value='${e.id}'>${e.name} — ${e.region}</option>`;
+    });
+  }
+
+  // Generate report on form submit
+  document.getElementById('reportForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const id   = document.getElementById('execSelect').value;
+    const type = document.getElementById('reportType').value;
+    if (!id) { alert('Please select an executive.'); return; }
+
+    const res = await fetch(`${API}/reports/${type}/${id}`);
+    reportData = await res.json();
+
+    renderReport(reportData, type);
+  };
+
+  function renderReport(data, type) {
+    // Destroy old mini maps to avoid Leaflet conflicts
+    miniMaps.forEach(m => m.remove());
+    miniMaps = [];
+
+    // Summary
+    const located = data.visits.filter(v => v.latitude && v.longitude).length;
+    document.getElementById('totalVisits').textContent   = data.total_visits;
+    document.getElementById('locatedVisits').textContent = located;
+    document.getElementById('reportPeriod').textContent  = data.date || data.period;
+
+    // Executive info
+    const exec = data.executive;
+    document.getElementById('execTitle').textContent =
+      `${exec.name} — ${type.charAt(0).toUpperCase() + type.slice(1)} Report`;
+    document.getElementById('execDetails').textContent =
+      `Region: ${exec.region}  |  Phone: ${exec.phone || 'N/A'}  |  Email: ${exec.email || 'N/A'}`;
+
+    // Visit cards
+    const container = document.getElementById('visitCards');
+    container.innerHTML = '';
+
+    if (!data.visits.length) {
+      container.innerHTML = `
+        <div class='card' style='text-align:center;color:#9ca3af;padding:40px'>
+          No visits recorded for this period.
+        </div>`;
+    } else {
+      data.visits.forEach((v, i) => {
+        const hasLocation = v.latitude && v.longitude;
+        const mapId = `map-${i}`;
+
+        const card = document.createElement('div');
+        card.className = 'visit-card';
+        card.innerHTML = `
+          <div class='visit-header'>
+            <div>
+              <div class='client'>${v.client_name}</div>
+              <div class='date'>${v.visit_date}</div>
+            </div>
+            <span class='badge'>${v.outcome || 'No outcome'}</span>
+          </div>
+          <div class='visit-body'>
+            <div class='visit-details'>
+              <div class='row'>
+                <div class='key'>Meeting Notes</div>
+                <div class='val'>${v.meeting_notes || '—'}</div>
+              </div>
+              <div class='row'>
+                <div class='key'>Location Recorded</div>
+                <div class='val'>${
+                  hasLocation
+                    ? `📍 ${parseFloat(v.latitude).toFixed(5)}, ${parseFloat(v.longitude).toFixed(5)}`
+                    : '⚠️ No location recorded for this visit'
+                }</div>
+              </div>
+              ${v.location_time ? `
+              <div class='row'>
+                <div class='key'>Location Time</div>
+                <div class='val'>${new Date(v.location_time).toLocaleString()}</div>
+              </div>` : ''}
+            </div>
+            <div class='visit-map'>
+              ${hasLocation
+                ? `<div id='${mapId}' class='mini-map'></div>`
+                : `<div class='no-location'>
+                    <div class='icon'>📵</div>
+                    <div>Location not shared</div>
+                    <div style='font-size:11px'>Executive did not share GPS on this day</div>
+                   </div>`
+              }
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+
+        // Initialize mini map after card is in DOM
+        if (hasLocation) {
+          setTimeout(() => {
+            const miniMap = L.map(mapId, { zoomControl: true, scrollWheelZoom: false })
+              .setView([v.latitude, v.longitude], 14);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              attribution: '© OpenStreetMap'
+            }).addTo(miniMap);
+
+            L.marker([v.latitude, v.longitude])
+              .addTo(miniMap)
+              .bindPopup(`
+                <b>${exec.name}</b><br>
+                Client: ${v.client_name}<br>
+                Date: ${v.visit_date}
+              `)
+              .openPopup();
+
+            miniMaps.push(miniMap);
+          }, 100);
+        }
+      });
+    }
+
+    document.getElementById('reportResult').style.display = 'block';
+
+    // Scroll down to results
+    document.getElementById('reportResult').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // Export CSV including location columns
+  function exportCSV() {
+    if (!reportData) return;
+    const rows = [
+      ['Client', 'Visit Date', 'Outcome', 'Meeting Notes', 'Latitude', 'Longitude', 'Location Time']
+    ];
+    reportData.visits.forEach(v => rows.push([
+      v.client_name,
+      v.visit_date,
+      v.outcome || '',
+      v.meeting_notes || '',
+      v.latitude  || 'Not recorded',
+      v.longitude || 'Not recorded',
+      v.location_time || 'Not recorded',
+    ]));
+    const csv  = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const link = document.createElement('a');
+    link.href  = URL.createObjectURL(blob);
+    link.download = `report_${reportData.executive?.name}_${Date.now()}.csv`;
+    link.click();
+  }
+
+  loadExecutives();
+</script>
+</body>
+</html>
